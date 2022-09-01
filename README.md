@@ -1,4 +1,44 @@
+SOLUTIONS TO THE ANSWER:
+- A tier 2 infrastructure is a highly available infra,  when a application is deployed to tow availability zone, One VPC, Two se[erate subnets one each of different zone
+- To cut cost, is to ahave an auto-scaler that will and HPA pods. this will scale up when traffic is up, and scale down during idle period
+- An ingress controller with an HPA will help solve the traffic issue
+- A Hpa cloud-sql by GCP is a managed MySql instance that is fully handled . This will take the MySql management budden from the company.
+
+### PRACTICAL ILLUSTRATION
+
+##IAC
+We automate the infrastructure with terraform for GKE
+- create an accout with gcloud
+- create a project  "playground"
+- create a service account with BASIC "EDITORS" (for this practice sake) ROLE to playgound project
+- Download gcloud sdk to your terninala dn activate the GCLOUD with the service account, Europe-west4 region
+- install terraform 
+- clone this repo https://github.com/cloudEthusiast/php-docker-rest-api.git
+- cd  /php-docker-rest-api.git/IAC-terraform-GKE-KCR-CloudSQL/terraform-google-gke/GKE-MYSQL-TERRAFORM/gke-private-clusster
+- terraform init 
+- terraform apply -auto-approve #his will deploy -a teir 2 GKE and  one GCR
+## create a teir 2 MYSQL DB
+- cd ../cloudsql/terraform-google-sql-db/MySql-terraform
+- terraform init
+- terraform apply -auto-approve
+
+
+##gcloud and kubectl 
+  # required for gcloud and kubectl to authenticate correctly
+            echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
+            gcloud --quiet config set project ${GOOGLE_PROJECT_ID}
+            gcloud --quiet config set compute/zone ${GOOGLE_COMPUTE_ZONE}
+            # required for terraform and terratest to authenticate correctly
+            echo $GCLOUD_SERVICE_KEY > /tmp/gcloud.json
+            export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcloud.json"
+            # run the tests
+            mkdir -p /tmp/logs
+            run-go-tests --path test --timeout 2h | tee /tmp/logs/all.log
+
+
 # PHP REST APIs
+
+
 
 Get Laravel 5.8.x database for your non laravel projects. Built on top of illuminate/database to provide migration, seeding and artisan support 
 
@@ -71,13 +111,8 @@ cp .env.example .env
 docker-compose up -d
 ```
 
-## Steps for running application on localhost using docker with SSL
-1. Create self-signed SSL certificate for localhost domain
-2. Self-signed SSL certificate creates *.crt and *.key files
-3. Rename *.crt with server.crt and *.key with server.key if files created in step 2 are with different name
-4. Copy server.crt and server.key files to the root directory
+## Steps for running application on GKE
 
-**Note - Using self-signed SSL certificate for production environment is not recommended.
 
 * Run below docker-compose command to build the container with HTTP(S)
 ```
@@ -110,3 +145,41 @@ docker-compose exec -T restapi php ./vendor/bin/phpunit --log-junit test-results
 [Composer-Docker](https://hub.docker.com/_/composer)
 
 [MySQL-Docker](https://hub.docker.com/r/mysql/mysql-server)
+
+## PUSH DOCKER IMAGE TO GCR
+
+## GCR  ---this will push the docker file to the gcr artifactory
+            gcloud auth activate-service-account --key-file PLAYGROUND.json ##add Artifactory role and the project to the service accoundt.
+            gcloud auth configure-docker europe-docker.pkg.dev
+            cat NG_REGISTRY_SA.json | docker login -u _json_key --password-stdin https://europe-docker.pkg.dev
+            docker push $IMAGE_NAME
+## DEPLOY TO K8S WITH BASTION HOST 
+  command: |
+            echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+            curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+            sudo apt-get update && sudo apt-get install google-cloud-sdk
+            gcloud config set project playground
+            gcloud auth activate-service-account --key-file playground.json
+            gcloud container clusters get-credentials example-gke --zone europe-west4-a  command: |
+            echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+            curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+            sudo apt-get update && sudo apt-get install google-cloud-sdk
+            echo -n $PLAYGROUND | base64 --decode > PLAYGROUND.json
+            gcloud config set project playground
+            gcloud auth activate-service-account --key-file PLAYGROUND.json
+            gcloud container clusters get-credentials example-gke --zone europe-west4-a
+
+#DEPLOY 
+- Create a MySql dbase name "abc-db" and password
+- fill the MYSQL db and ip addres on the kubernetes deployment files
+
+
+## The deployment files will create
+- Nmae-space ---dev-abc
+- secret # please convert the db- password to base64, and fill it on the ecret "dbase-password"
+- Create a deployemtn file
+- Create a Load balance service
+- create an HPA # to address the traffic and latency issue
+
+
+- 
