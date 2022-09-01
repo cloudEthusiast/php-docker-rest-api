@@ -1,0 +1,195 @@
+
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev-abc
+  labels:
+    app.kubernetes.io/name: abc
+    app.kubernetes.io/instance: abc
+    env: devuction
+---
+
+#DEPLOYMENT 
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/app-name: abc-service
+    app.kubernetes.io/cluster: frn-go-live
+    app.kubernetes.io/environment: dev
+    app.kubernetes.io/namespace: dev-abc
+    app.kubernetes.io/tier: backend
+  name: abc-service
+  namespace: dev-abc
+spec:
+  minReadySeconds: 60
+  progressDeadlineSeconds: 600
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/app-name: abc-service
+  strategy:
+    rollingUpdate:
+      maxSurge: 6
+      maxUnavailable: 3
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/app-name: abc-service
+    spec:
+      containers:
+      - env:
+        - name: abc_DATABASE_HOST
+          value: "10.4.0.13"
+        - name: abc_DATABASE_DATABASE
+          value: "dev-abc"
+        - name: abc_DATABASE_PORT
+          value: "5432"
+        - name: abc_DATABASE_USER
+          value: "dev-abc"
+        - name: abc_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: abc-service-secret
+              key: database_password
+        # - name: abc_OAUTH_JWKSURL
+        #   value: "https://dev-keycloak.frenn.com/auth/realms/dev-frenn/protocol/openid-connect/certs"
+        # - name: abc_KEYCLOAKSERVICE_BASEURL
+        #   value: "https://dev-keycloak.frenn.com"
+        # - name: abc_KEYCLOAKSERVICE_REALM
+        #   value: "dev-frenn"
+        # - name: abc_KEYCLOAKSERVICE_USERNAME
+        #   value: "guestuser"
+        # - name: abc_KEYCLOAKSERVICE_PASSWORD
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: abc-service-secret
+        #       key: keycloakservice_password
+        # - name: abc_KEYCLOAKSERVICE_CLIENTID
+        #   value: "dev-client"
+        # - name: abc_KEYCLOAKEXT_CLIENTSECRET
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: abc-service-secret
+        #       key: keycloakext_clientsecret
+        image:  europe-docker.pkg.dev/frenn-devops/fn-registry/abc-service:master-1f1e259
+        imagePullPolicy: Always        
+        name: abc-service
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+
+
+---
+#SERVIE LOAD BALANCER
+apiVersion: v1
+kind: Service
+metadata:
+  name: abc-service
+  namespace: dev-abc
+  labels:
+    app.kubernetes.io/app-name: abc-service
+    app.kubernetes.io/cluster: frn-go-live
+    app.kubernetes.io/environment: devuction
+    app.kubernetes.io/namespace: dev-abc
+    app.kubernetes.io/tier: backend
+spec:
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/app-name: abc-service
+  type: ClusterIP
+  loadBalancerIP:
+
+---
+# SECRET
+apiVersion: v1
+kind: Secret
+metadata:
+  name: abc-service-secret
+  namespace: dev-abc
+type: Opaque
+data:
+  database_password: RiVSb1hDc3MyQzI5JV41QF8rI0hOVyQleUdCRWg4OV8r
+#   keycloakservice_password: R3Vlc3QxMjMh
+#   keycloakext_clientsecret: NGVlNzAxMGUtNDM1MC00NjA4LTk2MzUtMDZkNWZlYjNkOTY4
+
+---
+#HPA HORIZONTAL AUTO SCALER
+
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: abc-hpa
+  namespace: dev-abc
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: abc-service 
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: AverageValue
+        averageValue: 100Mi
+
+#NETWORKING: SSL, INGRESS NGINX
+---
+
+# apiVersion: cert-manager.io/v1
+# kind: Certificate
+# metadata:
+#   name: dev-abc-cert
+#   namespace: dev-abc
+# spec:
+#   dnsNames:
+#    -  abc.frenn.com
+#   secretName: dev-abc-secret
+#   issuerRef:
+#     name: letsencrypt-cluster-issuer
+#     kind: ClusterIssuer
+
+# ---
+
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   namespace: dev-abc
+#   annotations:
+#     kubernetes.io/ingress.class: "nginx"
+#   name: dev-abc-ingress
+# spec:
+#   tls:
+#   - hosts:
+#     - abc.frenn.com
+#     secretName: dev-abc-secret
+#   rules:
+#   - host: abc.frenn.com
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service: 
+#             name: abc-service 
+#             port: 
+#               number: 8080
